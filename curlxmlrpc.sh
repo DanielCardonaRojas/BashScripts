@@ -13,6 +13,7 @@ function usage ()
     Options:
     -h|help       Display this message
     -v|version    Display script version
+    -r|raw    	  Display raw response, useful if xpath is not installed
     -s|           A string parameter
     -b|           A bool parameter (0,1)
     -i|           A int parameter 
@@ -25,6 +26,7 @@ function usage ()
 #  Handle command line arguments
 #-----------------------------------------------------------------------
 ALL_PARAMS=()
+SHOW_RAW=false
 
 # PARSE POSITIONAL PARAMETERS
 if [ -z "$1" ]; then
@@ -49,7 +51,7 @@ fi
 shift 2
 
 # PARSE OPTIONS
-while getopts ":hvs:i:f:b:" opt
+while getopts ":hvs:i:f:b:r" opt
 do
   case $opt in
 
@@ -68,6 +70,9 @@ do
         ;;
     b|bool  )  
         ALL_PARAMS+=("<param><value><boolean>$OPTARG</boolean></value></param>")
+        ;;
+    r|raw  )  
+        SHOW_RAW=true
         ;;
     \?)
         echo "Invalid option -$OPTARG"
@@ -100,17 +105,31 @@ shift $(($OPTIND-1))
 
 # Generalizing to differnt OS
 
+REQUEST_FORM="<methodCall><methodName>$METHOD_CALL</methodName><params>$ALL_PARAMS</params></methodCall>"
+
 if [ "$(uname)" == "Darwin" ]; then
     # Do something under Mac OS X platform        
-	curl -s -H 'Content-Type: text/xml' -d "<methodCall><methodName>$METHOD_CALL</methodName><params>$ALL_PARAMS</params></methodCall>" $HOST | \
-	xpath '//value//string|//value/base64|//value/double' | sed 's/<[^>]*>//g'
+	if [ $SHOW_RAW == "true" ]; then
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST
+	else
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST | \
+		xpath '//value//string|//value/base64|//value/double' | sed 's/<[^>]*>//g'
+	fi
 elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     # Do something under GNU/Linux platform
-	curl -s -H 'Content-Type: text/xml' -d "<methodCall><methodName>$METHOD_CALL</methodName><params>$ALL_PARAMS</params></methodCall>" $HOST | \
-	xmllint --format --xpath "//value//string/text()" - | sed 's/<[^>]*>//g'
+	if [ $SHOW_RAW == "true" ]; then
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST
+	else
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST | \
+		xmllint --format --xpath "//value//string/text()" - | sed 's/<[^>]*>//g'
+	fi
 elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
     # Do something under Windows NT platform
-	curl -s -H 'Content-Type: text/xml' -d "<methodCall><methodName>$METHOD_CALL</methodName><params>$ALL_PARAMS</params></methodCall>" $HOST | \
-	xpath '//value//string|//value/base64|//value/double' | sed 's/<[^>]*>//g'
+	if [ $SHOW_RAW == "true" ]; then
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST
+	else
+		curl -s -H 'Content-Type: text/xml' -d $REQUEST_FORM $HOST | \
+		xpath '//value//string|//value/base64|//value/double' | sed 's/<[^>]*>//g'
+	fi
 fi
 
